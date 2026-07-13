@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppVersion, User } from './types';
 import {
   checkAuth,
@@ -33,6 +33,9 @@ import {
   Shield,
   LaptopIcon,
   Search,
+  Plus,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -150,12 +153,70 @@ export default function App() {
     : null;
 
   // Render App UI Mockup details (simulate KhataIndex app itself)
-  const mockupLedgers = [
-    { name: 'Karan Mehra (Supplier)', action: 'You Gave', amount: '₹12,400', date: 'Today, 2:15 PM', isNegative: true },
-    { name: 'Sharma General Store', action: 'You Got', amount: '₹4,250', date: 'Yesterday, 6:30 PM', isNegative: false },
-    { name: 'Amit Verma (Customer)', action: 'You Gave', amount: '₹1,500', date: 'July 11, 11:00 AM', isNegative: true },
-    { name: 'Royal Furniture', action: 'You Got', amount: '₹22,000', date: 'July 09, 4:10 PM', isNegative: false }
+  const defaultLedgers = [
+    { id: 1, name: 'Karan Mehra (Supplier)', action: 'You Gave', amount: 12400, date: 'Today, 2:15 PM', isNegative: true },
+    { id: 2, name: 'Sharma General Store', action: 'You Got', amount: 4250, date: 'Yesterday, 6:30 PM', isNegative: false },
+    { id: 3, name: 'Amit Verma (Customer)', action: 'You Gave', amount: 1500, date: 'July 11, 11:00 AM', isNegative: true },
+    { id: 4, name: 'Royal Furniture', action: 'You Got', amount: 22000, date: 'July 09, 4:10 PM', isNegative: false }
   ];
+
+  const [ledgers, setLedgers] = useState(defaultLedgers);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchInput, setShowSearchInput] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newLedgerName, setNewLedgerName] = useState('');
+  const [newLedgerAmount, setNewLedgerAmount] = useState('');
+  const [newLedgerIsNegative, setNewLedgerIsNegative] = useState(true);
+
+  // Dynamic balance calculations based on simulated state
+  const youWillGet = ledgers.filter(l => !l.isNegative).reduce((sum, l) => sum + l.amount, 0);
+  const youWillGive = ledgers.filter(l => l.isNegative).reduce((sum, l) => sum + l.amount, 0);
+  const totalBalance = youWillGet - youWillGive;
+
+  const handleResetLedgers = () => {
+    setLedgers(defaultLedgers);
+    setSearchQuery('');
+    setShowSearchInput(false);
+    setIsAddOpen(false);
+    showSuccess('Interactive Demo ledger state has been reset.');
+  };
+
+  const handleAddLedger = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLedgerName.trim()) {
+      setErrorMessage('Please enter a valid ledger name.');
+      return;
+    }
+    const parsedAmount = parseFloat(newLedgerAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setErrorMessage('Please enter a valid amount.');
+      return;
+    }
+
+    const newRecord = {
+      id: Date.now(),
+      name: newLedgerName.trim(),
+      action: newLedgerIsNegative ? 'You Gave' : 'You Got',
+      amount: parsedAmount,
+      date: 'Just Now',
+      isNegative: newLedgerIsNegative
+    };
+
+    setLedgers([newRecord, ...ledgers]);
+    setNewLedgerName('');
+    setNewLedgerAmount('');
+    setIsAddOpen(false);
+    showSuccess(`Added ledger card for "${newRecord.name}"!`);
+  };
+
+  const handleDeleteLedger = (id: number) => {
+    setLedgers(prev => prev.filter(l => l.id !== id));
+    showSuccess('Ledger record removed.');
+  };
+
+  const filteredLedgers = ledgers.filter(l =>
+    l.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (appLoading) {
     return (
@@ -394,9 +455,16 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="w-full h-full bg-slate-900 rounded-[36px] overflow-hidden flex flex-col justify-between pt-6 text-white text-xs select-none relative font-sans">
+                    <div className="w-full h-full bg-[#0d0f1e] rounded-[36px] overflow-hidden flex flex-col justify-between pt-6 text-white text-xs select-none relative font-sans">
                       {screenshotUrl && (
-                        <div className="absolute top-2 right-2 z-30">
+                        <div className="absolute top-2 right-2 z-30 flex items-center space-x-1">
+                          <button
+                            onClick={handleResetLedgers}
+                            title="Reset State"
+                            className="inline-flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 p-1.5 text-slate-300 transition-all border border-white/10"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
                           <button
                             onClick={() => setShowScreenshot(true)}
                             className="inline-flex items-center rounded-xl bg-blue-600/95 hover:bg-blue-500 px-2.5 py-1 text-[9px] font-bold text-white shadow transition-all border border-blue-500/30"
@@ -407,78 +475,229 @@ export default function App() {
                       )}
                       
                       {/* App Header mockup */}
-                      <div className="p-4 flex items-center justify-between border-b border-white/5 bg-slate-950/40">
-                        <div className="flex items-center space-x-1.5">
-                          <div className="h-6 w-6 rounded bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-                            K
+                      <div className="p-3 flex items-center justify-between border-b border-white/5 bg-slate-950/40 relative z-10">
+                        {showSearchInput ? (
+                          <div className="flex items-center w-full space-x-1">
+                            <input
+                              type="text"
+                              placeholder="Search ledger..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-full bg-slate-800/80 text-[10px] text-white placeholder-slate-500 rounded-lg px-2 py-1 outline-none border border-white/10 font-sans"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => {
+                                setShowSearchInput(false);
+                                setSearchQuery('');
+                              }}
+                              className="text-slate-400 hover:text-white px-1 text-[10px] font-bold"
+                            >
+                              ✕
+                            </button>
                           </div>
-                          <span className="font-bold tracking-tight">KhataIndex</span>
-                        </div>
-                        <div className="flex space-x-1">
-                          <Search className="h-4 w-4 text-slate-400" />
-                          <div className="h-1.5 w-1.5 rounded-full bg-blue-400 self-center" />
-                        </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center space-x-1.5">
+                              <div className="h-5 w-5 rounded bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-black text-white shadow-sm">
+                                K
+                              </div>
+                              <span className="font-bold tracking-tight text-[11px]">KhataIndex</span>
+                            </div>
+                            <div className="flex space-x-1.5 items-center">
+                              <button
+                                onClick={() => setShowSearchInput(true)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                              >
+                                <Search className="h-3.5 w-3.5" />
+                              </button>
+                              <div className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* App Dashboard Account Balance card mockup */}
-                      <div className="px-4 py-2.5 sm:py-3 space-y-3">
-                        <div className="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-2">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                      <div className="px-4 py-2 shrink-0">
+                        <div className="bg-white/5 rounded-2xl p-3 border border-white/10 space-y-1.5">
+                          <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
                             Total Balance
                           </div>
-                          <div className="text-xl font-bold text-blue-400">
-                            ₹14,350 <span className="text-[10px] text-slate-400 font-normal">due to you</span>
+                          <div className={`text-base font-extrabold ${totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                            {totalBalance >= 0 ? '+' : ''}₹{totalBalance.toLocaleString('en-IN')}{' '}
+                            <span className="text-[9px] text-slate-400 font-normal">
+                              {totalBalance >= 0 ? 'due to you' : 'you owe'}
+                            </span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px]">
+                          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5 text-[9px]">
                             <div>
                               <span className="text-slate-400 block">You Will Get</span>
-                              <span className="text-blue-300 font-bold">₹26,250</span>
+                              <span className="text-blue-300 font-bold">₹{youWillGet.toLocaleString('en-IN')}</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block">You Will Give</span>
-                              <span className="text-red-400 font-bold">₹13,900</span>
+                              <span className="text-red-400 font-bold">₹{youWillGive.toLocaleString('en-IN')}</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
                       {/* App Recent transaction list mockup */}
-                      <div className="flex-1 px-4 min-h-0 overflow-hidden flex flex-col space-y-2">
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 uppercase shrink-0">
-                          <span>Recent Ledger Cards</span>
-                          <span className="text-blue-400 font-bold text-[9px] hover:underline cursor-pointer font-sans">View All</span>
-                        </div>
-
-                        <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1 min-h-0 no-scrollbar">
-                          {mockupLedgers.map((ledger, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5"
+                      <div className="flex-1 px-4 min-h-0 overflow-hidden flex flex-col space-y-1.5 relative">
+                        <div className="flex items-center justify-between text-[9px] font-semibold text-slate-400 uppercase shrink-0">
+                          <span>Recent Ledgers ({filteredLedgers.length})</span>
+                          {ledgers.length !== defaultLedgers.length && (
+                            <button
+                              onClick={handleResetLedgers}
+                              className="text-blue-400 font-bold text-[8px] hover:underline"
                             >
-                              <div className="space-y-0.5">
-                                <span className="font-bold block text-[11px] text-slate-200 truncate max-w-[120px]">
-                                  {ledger.name}
-                                </span>
-                                <span className="text-[9px] text-slate-500">{ledger.date}</span>
+                              Reset
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1 min-h-0 no-scrollbar relative">
+                          {filteredLedgers.length === 0 ? (
+                            <div className="text-center py-8 text-slate-500 text-[10px]">
+                              No matches found.
+                            </div>
+                          ) : (
+                            filteredLedgers.map((ledger) => (
+                              <div
+                                key={ledger.id}
+                                className="group/item flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
+                              >
+                                <div className="space-y-0.5 min-w-0 flex-1 pr-1">
+                                  <span className="font-bold block text-[10px] text-slate-200 truncate">
+                                    {ledger.name}
+                                  </span>
+                                  <span className="text-[8px] text-slate-500 block">{ledger.date}</span>
+                                </div>
+
+                                <div className="text-right flex items-center space-x-2 shrink-0">
+                                  <div>
+                                    <span
+                                      className={`font-bold block text-[10px] ${
+                                        ledger.isNegative ? 'text-red-400' : 'text-blue-400'
+                                      }`}
+                                    >
+                                      ₹{ledger.amount.toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 uppercase font-semibold block">
+                                      {ledger.action}
+                                    </span>
+                                  </div>
+                                  
+                                  <button
+                                    onClick={() => handleDeleteLedger(ledger.id)}
+                                    className="p-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                    title="Delete ledger entry"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Floating Add Button inside simulated phone */}
+                        <button
+                          onClick={() => setIsAddOpen(true)}
+                          className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-500 shadow-lg flex items-center justify-center text-white transition-transform hover:scale-105 z-10 animate-pulse"
+                          title="Add new entry"
+                        >
+                          <Plus className="h-4.5 w-4.5" />
+                        </button>
+                      </div>
+
+                      {/* Drawer Panel inside phone mockup */}
+                      <AnimatePresence>
+                        {isAddOpen && (
+                          <motion.div
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                            className="absolute inset-x-0 bottom-0 bg-slate-950 border-t border-white/10 rounded-t-3xl p-4 z-30 font-sans shadow-2xl"
+                          >
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                              <span className="text-[10px] font-black text-white tracking-wide uppercase">
+                                Create Ledger Card
+                              </span>
+                              <button
+                                onClick={() => setIsAddOpen(false)}
+                                className="text-slate-400 hover:text-white p-1"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            <form onSubmit={handleAddLedger} className="space-y-3 text-[10px]">
+                              <div>
+                                <label className="block text-slate-400 mb-1 font-semibold">Ledger Card Name</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="e.g. Ramesh (Wholesaler)"
+                                  value={newLedgerName}
+                                  onChange={(e) => setNewLedgerName(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 text-white placeholder-slate-600"
+                                />
                               </div>
 
-                              <div className="text-right">
-                                <span
-                                  className={`font-bold block text-[11px] ${
-                                    ledger.isNegative ? 'text-red-400' : 'text-blue-400'
-                                  }`}
-                                >
-                                  {ledger.amount}
-                                </span>
-                                <span className="text-[8px] text-slate-500 uppercase font-semibold">
-                                  {ledger.action}
-                                </span>
+                              <div>
+                                <label className="block text-slate-400 mb-1 font-semibold">Transaction Amount (₹)</label>
+                                <input
+                                  type="number"
+                                  required
+                                  min="1"
+                                  placeholder="e.g. 5000"
+                                  value={newLedgerAmount}
+                                  onChange={(e) => setNewLedgerAmount(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 text-white placeholder-slate-600"
+                                />
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+
+                              <div>
+                                <label className="block text-slate-400 mb-1 font-semibold">Transaction Type</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewLedgerIsNegative(true)}
+                                    className={`py-1.5 rounded-lg border font-bold text-center transition-all ${
+                                      newLedgerIsNegative
+                                        ? 'bg-red-500/20 border-red-500 text-red-300'
+                                        : 'bg-white/5 border-white/10 text-slate-400'
+                                    }`}
+                                  >
+                                    You Gave
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewLedgerIsNegative(false)}
+                                    className={`py-1.5 rounded-lg border font-bold text-center transition-all ${
+                                      !newLedgerIsNegative
+                                        ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                        : 'bg-white/5 border-white/10 text-slate-400'
+                                    }`}
+                                  >
+                                    You Got
+                                  </button>
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-lg shadow-md transition-all mt-1"
+                              >
+                                Save Ledger Card
+                              </button>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
                       {/* Bottom controls mockup */}
                       <div className="p-3 border-t border-white/5 bg-slate-950/80 flex justify-around items-center rounded-b-[36px] text-[10px] font-bold text-slate-400 shrink-0">
@@ -514,7 +733,7 @@ export default function App() {
             />
 
             {/* INSTALL GUIDE CARD SECTION */}
-            <InstallGuide />
+            <InstallGuide versions={versions} />
           </div>
         )}
       </main>

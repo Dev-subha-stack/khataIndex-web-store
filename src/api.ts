@@ -13,6 +13,19 @@ function getHeaders(): HeadersInit {
   return headers;
 }
 
+async function safeJson(res: Response): Promise<any> {
+  try {
+    const text = await res.text();
+    if (!text || text.trim() === '') {
+      return {};
+    }
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('Failed to parse JSON response safely:', err);
+    return {};
+  }
+}
+
 export async function checkAuth(): Promise<User | null> {
   const token = localStorage.getItem('khataindex_token');
   if (!token) return null;
@@ -25,8 +38,8 @@ export async function checkAuth(): Promise<User | null> {
       localStorage.removeItem('khataindex_token');
       return null;
     }
-    const data = await res.json();
-    return data.user;
+    const data = await safeJson(res);
+    return data?.user || null;
   } catch (error) {
     console.error('Error verifying token', error);
     return null;
@@ -41,11 +54,11 @@ export async function login(loginIdentifier: string, password: string): Promise<
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Login failed');
   }
 
-  const data = await res.json();
+  const data = await safeJson(res);
   localStorage.setItem('khataindex_token', data.token);
   return data;
 }
@@ -58,11 +71,11 @@ export async function register(username: string, email: string, password: string
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Registration failed');
   }
 
-  const data = await res.json();
+  const data = await safeJson(res);
   localStorage.setItem('khataindex_token', data.token);
   return data;
 }
@@ -84,7 +97,8 @@ export async function getVersions(): Promise<AppVersion[]> {
   if (!res.ok) {
     throw new Error('Failed to fetch versions');
   }
-  return res.json();
+  const data = await safeJson(res);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function uploadVersion(
@@ -109,11 +123,11 @@ export async function uploadVersion(
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to upload version');
   }
 
-  return res.json();
+  return safeJson(res);
 }
 
 export async function deleteVersion(id: string): Promise<void> {
@@ -123,7 +137,7 @@ export async function deleteVersion(id: string): Promise<void> {
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to delete version');
   }
 }
@@ -143,7 +157,7 @@ export async function downloadFile(id: string, filename: string): Promise<void> 
     if (res.status === 401) {
       throw new Error('Please login to download the application.');
     }
-    const errorData = await res.json().catch(() => ({}));
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to download file');
   }
 
@@ -166,11 +180,11 @@ export async function updateProfile(username: string, email: string, password?: 
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to update profile');
   }
 
-  const data = await res.json();
+  const data = await safeJson(res);
   return data.user;
 }
 
@@ -182,11 +196,11 @@ export async function submitFeedback(type: string, message: string): Promise<Fee
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to submit feedback');
   }
 
-  return res.json();
+  return safeJson(res);
 }
 
 export async function getFeedbacks(): Promise<Feedback[]> {
@@ -195,11 +209,12 @@ export async function getFeedbacks(): Promise<Feedback[]> {
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to fetch feedback list');
   }
 
-  return res.json();
+  const data = await safeJson(res);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getAppSettings(): Promise<{ screenshotUrl?: string }> {
@@ -207,7 +222,7 @@ export async function getAppSettings(): Promise<{ screenshotUrl?: string }> {
   if (!res.ok) {
     throw new Error('Failed to fetch settings');
   }
-  return res.json();
+  return safeJson(res);
 }
 
 export async function updateAppSettings(screenshotUrl: string | null): Promise<{ screenshotUrl?: string }> {
@@ -218,9 +233,9 @@ export async function updateAppSettings(screenshotUrl: string | null): Promise<{
   });
 
   if (!res.ok) {
-    const errorData = await res.json();
+    const errorData = await safeJson(res);
     throw new Error(errorData.error || 'Failed to update settings');
   }
 
-  return res.json();
+  return safeJson(res);
 }
