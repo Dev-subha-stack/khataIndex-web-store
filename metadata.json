@@ -1,0 +1,6 @@
+{
+  "name": "KhataIndex",
+  "description": "KhataIndex tracks transactions, records business credit debit logs, and indices multiple accounts in one compact mobile APK file.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

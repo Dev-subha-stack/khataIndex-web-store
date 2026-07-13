@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User accounts registered on KhataIndex.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "username", "email", "passwordHash", "role", "createdAt"]
+    },
+    "Version": {
+      "title": "Version",
+      "description": "Information about APK versions and releases.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "versionString": { "type": "string" },
+        "versionCode": { "type": "number" },
+        "releaseNotes": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "filename": { "type": "string" },
+        "downloadCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "versionString", "versionCode", "releaseNotes", "fileSize", "filename", "downloadCount", "createdAt"]
+    },
+    "Token": {
+      "title": "Token",
+      "description": "User authentication session tokens.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and credentials"
+    },
+    "/versions/{versionId}": {
+      "schema": "Version",
+      "description": "Version details and metadata"
+    },
+    "/tokens/{tokenId}": {
+      "schema": "Token",
+      "description": "User session token maps"
+    }
+  }
+}
