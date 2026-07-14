@@ -12,6 +12,8 @@ import {
   getAppSettings,
   updateAppSettings,
   isUsingLocalFallback,
+  checkBackendHealth,
+  setUsingLocalFallback,
 } from './api';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
@@ -37,6 +39,8 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -90,6 +94,17 @@ export default function App() {
   useEffect(() => {
     async function initData() {
       try {
+        // Automatically check if the full-stack server is healthy and alive
+        const isHealthy = await checkBackendHealth();
+        if (isHealthy) {
+          setUsingLocalFallback(false);
+        } else {
+          // If server is unreachable and no forced fallback is stored, fall back to sandbox
+          if (localStorage.getItem('khataindex_forced_local_fallback') !== 'false') {
+            setUsingLocalFallback(true);
+          }
+        }
+
         const currentUser = await checkAuth();
         setUser(currentUser);
         
@@ -201,6 +216,7 @@ export default function App() {
   const [newLedgerName, setNewLedgerName] = useState('');
   const [newLedgerAmount, setNewLedgerAmount] = useState('');
   const [newLedgerIsNegative, setNewLedgerIsNegative] = useState(true);
+  const [isMockupDarkMode, setIsMockupDarkMode] = useState<boolean>(true);
 
   // Dynamic balance calculations based on simulated state
   const youWillGet = ledgers.filter(l => !l.isNegative).reduce((sum, l) => sum + l.amount, 0);
@@ -312,26 +328,50 @@ export default function App() {
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         currentTab={currentTab}
         onChangeTab={(tab) => setCurrentTab(tab)}
+        isFallback={isFallback}
       />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
         {isFallback && (
-          <div className="mb-8 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-5 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs animate-pulse">
+          <div className="mb-8 rounded-2xl bg-amber-500/5 border border-amber-500/20 px-5 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
             <div className="flex items-start space-x-3 text-slate-300">
               <span className="text-lg leading-none mt-0.5">🌐</span>
               <div>
-                <span className="font-extrabold text-blue-300">Cloudflare Static Web Sandbox Active</span>
+                <span className="font-extrabold text-amber-300">Local Sandbox Mode Active</span>
                 <p className="mt-1 text-[11px] text-slate-400 max-w-2xl leading-relaxed">
-                  We detected that this site is deployed on a static hosting platform (e.g. Cloudflare Pages). 
-                  Since there is no Express server backend, we have enabled a secure, high-speed <strong>local sandbox storage engine</strong>. 
-                  You can register a new account or sign in using the pre-seeded developer credentials: 
-                  <strong className="text-white ml-1">subhajit@khataindex.com</strong> (Password: <strong className="text-white">Subhajit#123</strong>) to access the Admin Panel.
+                  The client is running in local offline storage mode because the Express API was unreachable, or you've chosen to use the Sandbox.
+                  If you have deployed this app on a full-stack platform like <strong>Google Cloud Run</strong> or our development server, you can connect directly to the real database.
+                  Developer account credentials: <strong className="text-white font-mono">subhajit@khataindex.com</strong> (Password: <strong className="text-white font-mono">Subhajit#123</strong>).
                 </p>
               </div>
             </div>
-            <div className="shrink-0">
-              <span className="inline-flex items-center rounded-lg bg-blue-500/15 px-2.5 py-1 text-[10px] font-bold text-blue-300 border border-blue-500/20">
-                100% Client-Side Sandbox
+            <div className="shrink-0 flex flex-col sm:flex-row items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    setStatusMessage('Testing connection to Live Server...');
+                    const healthy = await checkBackendHealth();
+                    if (healthy) {
+                      setUsingLocalFallback(false);
+                      showSuccess('Successfully connected to the full-stack server backend!');
+                      // Refresh data from the live server
+                      const currentUser = await checkAuth();
+                      setUser(currentUser);
+                      const allVersions = await getVersions();
+                      setVersions(allVersions);
+                    } else {
+                      setErrorMessage('Could not connect to the Express server. Please verify the backend is running and healthy.');
+                    }
+                  } catch (e) {
+                    setErrorMessage('Failed to connect to the backend server.');
+                  }
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold px-3.5 py-2 text-[11px] shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+              >
+                🔄 Reconnect to Server
+              </button>
+              <span className="inline-flex items-center justify-center rounded-xl bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-300 border border-amber-500/25">
+                Local Sandbox
               </span>
             </div>
           </div>
@@ -511,13 +551,21 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="w-full h-full bg-[#0d0f1e] rounded-[36px] overflow-hidden flex flex-col justify-between pt-6 text-white text-xs select-none relative font-sans">
+                    <div className={`w-full h-full rounded-[36px] overflow-hidden flex flex-col justify-between pt-6 text-xs select-none relative font-sans transition-colors duration-300 ${
+                      isMockupDarkMode 
+                        ? 'bg-[#0d0f1e] text-white' 
+                        : 'bg-slate-50 text-slate-800'
+                    }`}>
                       {screenshotUrl && (
                         <div className="absolute top-2 right-2 z-30 flex items-center space-x-1">
                           <button
                             onClick={handleResetLedgers}
                             title="Reset State"
-                            className="inline-flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 p-1.5 text-slate-300 transition-all border border-white/10"
+                            className={`inline-flex items-center justify-center rounded-xl p-1.5 transition-all border ${
+                              isMockupDarkMode
+                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-white/10'
+                                : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200 shadow-sm'
+                            }`}
                           >
                             <RotateCcw className="h-3 w-3" />
                           </button>
@@ -531,7 +579,11 @@ export default function App() {
                       )}
                       
                       {/* App Header mockup */}
-                      <div className="p-3 flex items-center justify-between border-b border-white/5 bg-slate-950/40 relative z-10">
+                      <div className={`p-3 flex items-center justify-between border-b relative z-10 transition-colors duration-300 ${
+                        isMockupDarkMode 
+                          ? 'border-white/5 bg-slate-950/40 text-white' 
+                          : 'border-slate-200 bg-white text-slate-900 shadow-sm'
+                      }`}>
                         {showSearchInput ? (
                           <div className="flex items-center w-full space-x-1">
                             <input
@@ -539,7 +591,11 @@ export default function App() {
                               placeholder="Search ledger..."
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full bg-slate-800/80 text-[10px] text-white placeholder-slate-500 rounded-lg px-2 py-1 outline-none border border-white/10 font-sans"
+                              className={`w-full text-[10px] rounded-lg px-2 py-1 outline-none border font-sans transition-colors ${
+                                isMockupDarkMode 
+                                  ? 'bg-slate-800/80 text-white placeholder-slate-500 border-white/10' 
+                                  : 'bg-slate-100 text-slate-900 placeholder-slate-400 border-slate-200 focus:border-blue-500'
+                              }`}
                               autoFocus
                             />
                             <button
@@ -547,7 +603,9 @@ export default function App() {
                                 setShowSearchInput(false);
                                 setSearchQuery('');
                               }}
-                              className="text-slate-400 hover:text-white px-1 text-[10px] font-bold"
+                              className={`px-1 text-[10px] font-bold ${
+                                isMockupDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                              }`}
                             >
                               ✕
                             </button>
@@ -558,12 +616,34 @@ export default function App() {
                               <div className="h-5 w-5 rounded bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-black text-white shadow-sm">
                                 K
                               </div>
-                              <span className="font-bold tracking-tight text-[11px]">KhataIndex</span>
+                              <span className={`font-bold tracking-tight text-[11px] ${
+                                isMockupDarkMode ? 'text-white' : 'text-slate-900'
+                              }`}>KhataIndex</span>
                             </div>
                             <div className="flex space-x-1.5 items-center">
+                              {/* Theme Toggle Button */}
+                              <button
+                                onClick={() => setIsMockupDarkMode(!isMockupDarkMode)}
+                                className={`p-1 rounded-lg transition-colors ${
+                                  isMockupDarkMode 
+                                    ? 'text-slate-400 hover:text-white hover:bg-white/5' 
+                                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                                }`}
+                                title={isMockupDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                              >
+                                {isMockupDarkMode ? (
+                                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                                ) : (
+                                  <Moon className="h-3.5 w-3.5 text-indigo-600" />
+                                )}
+                              </button>
                               <button
                                 onClick={() => setShowSearchInput(true)}
-                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                                className={`p-1 rounded-lg transition-colors ${
+                                  isMockupDarkMode 
+                                    ? 'text-slate-400 hover:text-white hover:bg-white/5' 
+                                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                                }`}
                               >
                                 <Search className="h-3.5 w-3.5" />
                               </button>
@@ -575,25 +655,35 @@ export default function App() {
 
                       {/* App Dashboard Account Balance card mockup */}
                       <div className="px-4 py-2 shrink-0">
-                        <div className="bg-white/5 rounded-2xl p-3 border border-white/10 space-y-1.5">
-                          <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                        <div className={`rounded-2xl p-3 border space-y-1.5 transition-all duration-300 ${
+                          isMockupDarkMode 
+                            ? 'bg-white/5 border-white/10' 
+                            : 'bg-white border-slate-200 shadow-md text-slate-900'
+                        }`}>
+                          <div className={`text-[9px] uppercase tracking-wider font-semibold ${
+                            isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                          }`}>
                             Total Balance
                           </div>
                           <div className={`text-base font-extrabold ${totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
                             {totalBalance >= 0 ? '+' : ''}₹{totalBalance.toLocaleString('en-IN')}{' '}
-                            <span className="text-[9px] text-slate-400 font-normal">
+                            <span className={`text-[9px] font-normal ${
+                              isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                            }`}>
                               {totalBalance >= 0 ? 'due to you' : 'you owe'}
                             </span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5 text-[9px]">
+                          <div className={`grid grid-cols-2 gap-2 pt-1.5 border-t text-[9px] ${
+                            isMockupDarkMode ? 'border-white/5' : 'border-slate-100'
+                          }`}>
                             <div>
-                              <span className="text-slate-400 block">You Will Get</span>
-                              <span className="text-blue-300 font-bold">₹{youWillGet.toLocaleString('en-IN')}</span>
+                              <span className={`block ${isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>You Will Get</span>
+                              <span className={`font-bold ${isMockupDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>₹{youWillGet.toLocaleString('en-IN')}</span>
                             </div>
                             <div>
-                              <span className="text-slate-400 block">You Will Give</span>
-                              <span className="text-red-400 font-bold">₹{youWillGive.toLocaleString('en-IN')}</span>
+                              <span className={`block ${isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>You Will Give</span>
+                              <span className={`font-bold ${isMockupDarkMode ? 'text-red-400' : 'text-red-500'}`}>₹{youWillGive.toLocaleString('en-IN')}</span>
                             </div>
                           </div>
                         </div>
@@ -601,12 +691,16 @@ export default function App() {
 
                       {/* App Recent transaction list mockup */}
                       <div className="flex-1 px-4 min-h-0 overflow-hidden flex flex-col space-y-1.5 relative">
-                        <div className="flex items-center justify-between text-[9px] font-semibold text-slate-400 uppercase shrink-0">
+                        <div className={`flex items-center justify-between text-[9px] font-semibold uppercase shrink-0 ${
+                          isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                           <span>Recent Ledgers ({filteredLedgers.length})</span>
                           {ledgers.length !== defaultLedgers.length && (
                             <button
                               onClick={handleResetLedgers}
-                              className="text-blue-400 font-bold text-[8px] hover:underline"
+                              className={`font-bold text-[8px] hover:underline ${
+                                isMockupDarkMode ? 'text-blue-400' : 'text-blue-600'
+                              }`}
                             >
                               Reset
                             </button>
@@ -615,20 +709,30 @@ export default function App() {
 
                         <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1 min-h-0 no-scrollbar relative">
                           {filteredLedgers.length === 0 ? (
-                            <div className="text-center py-8 text-slate-500 text-[10px]">
+                            <div className={`text-center py-8 text-[10px] ${
+                              isMockupDarkMode ? 'text-slate-500' : 'text-slate-400'
+                            }`}>
                               No matches found.
                             </div>
                           ) : (
                             filteredLedgers.map((ledger) => (
                               <div
                                 key={ledger.id}
-                                className="group/item flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
+                                className={`group/item flex items-center justify-between p-2 rounded-xl border transition-colors ${
+                                  isMockupDarkMode 
+                                    ? 'bg-white/5 border-white/5 hover:bg-white/10' 
+                                    : 'bg-white border-slate-100 hover:bg-slate-100/50 shadow-sm'
+                                }`}
                               >
                                 <div className="space-y-0.5 min-w-0 flex-1 pr-1">
-                                  <span className="font-bold block text-[10px] text-slate-200 truncate">
+                                  <span className={`font-bold block text-[10px] truncate ${
+                                    isMockupDarkMode ? 'text-slate-200' : 'text-slate-800'
+                                  }`}>
                                     {ledger.name}
                                   </span>
-                                  <span className="text-[8px] text-slate-500 block">{ledger.date}</span>
+                                  <span className={`text-[8px] block ${
+                                    isMockupDarkMode ? 'text-slate-500' : 'text-slate-400'
+                                  }`}>{ledger.date}</span>
                                 </div>
 
                                 <div className="text-right flex items-center space-x-2 shrink-0">
@@ -640,14 +744,20 @@ export default function App() {
                                     >
                                       ₹{ledger.amount.toLocaleString('en-IN')}
                                     </span>
-                                    <span className="text-[8px] text-slate-500 uppercase font-semibold block">
+                                    <span className={`text-[8px] uppercase font-semibold block ${
+                                      isMockupDarkMode ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>
                                       {ledger.action}
                                     </span>
                                   </div>
                                   
                                   <button
                                     onClick={() => handleDeleteLedger(ledger.id)}
-                                    className="p-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                    className={`p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity ${
+                                      isMockupDarkMode 
+                                        ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400' 
+                                        : 'bg-red-50 hover:bg-red-100 text-red-500 border border-red-100'
+                                    }`}
                                     title="Delete ledger entry"
                                   >
                                     <Trash2 className="h-3 w-3" />
@@ -676,15 +786,25 @@ export default function App() {
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                            className="absolute inset-x-0 bottom-0 bg-slate-950 border-t border-white/10 rounded-t-3xl p-4 z-30 font-sans shadow-2xl"
+                            className={`absolute inset-x-0 bottom-0 border-t rounded-t-3xl p-4 z-30 font-sans shadow-2xl transition-colors duration-300 ${
+                              isMockupDarkMode 
+                                ? 'bg-slate-950 border-white/10 text-white' 
+                                : 'bg-white border-slate-200 text-slate-800'
+                            }`}
                           >
-                            <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
-                              <span className="text-[10px] font-black text-white tracking-wide uppercase">
+                            <div className={`flex items-center justify-between border-b pb-2 mb-3 ${
+                              isMockupDarkMode ? 'border-white/5' : 'border-slate-100'
+                            }`}>
+                              <span className={`text-[10px] font-black tracking-wide uppercase ${
+                                isMockupDarkMode ? 'text-white' : 'text-slate-950'
+                              }`}>
                                 Create Ledger Card
                               </span>
                               <button
                                 onClick={() => setIsAddOpen(false)}
-                                className="text-slate-400 hover:text-white p-1"
+                                className={`p-1 transition-colors ${
+                                  isMockupDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-600'
+                                }`}
                               >
                                 ✕
                               </button>
@@ -692,19 +812,27 @@ export default function App() {
 
                             <form onSubmit={handleAddLedger} className="space-y-3 text-[10px]">
                               <div>
-                                <label className="block text-slate-400 mb-1 font-semibold">Ledger Card Name</label>
+                                <label className={`block mb-1 font-semibold ${
+                                  isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>Ledger Card Name</label>
                                 <input
                                   type="text"
                                   required
                                   placeholder="e.g. Ramesh (Wholesaler)"
                                   value={newLedgerName}
                                   onChange={(e) => setNewLedgerName(e.target.value)}
-                                  className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 text-white placeholder-slate-600"
+                                  className={`w-full border rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 transition-colors ${
+                                    isMockupDarkMode 
+                                      ? 'bg-white/5 border-white/10 text-white placeholder-slate-600' 
+                                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                                  }`}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-slate-400 mb-1 font-semibold">Transaction Amount (₹)</label>
+                                <label className={`block mb-1 font-semibold ${
+                                  isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>Transaction Amount (₹)</label>
                                 <input
                                   type="number"
                                   required
@@ -712,20 +840,30 @@ export default function App() {
                                   placeholder="e.g. 5000"
                                   value={newLedgerAmount}
                                   onChange={(e) => setNewLedgerAmount(e.target.value)}
-                                  className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 text-white placeholder-slate-600"
+                                  className={`w-full border rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 transition-colors ${
+                                    isMockupDarkMode 
+                                      ? 'bg-white/5 border-white/10 text-white placeholder-slate-600' 
+                                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                                  }`}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-slate-400 mb-1 font-semibold">Transaction Type</label>
+                                <label className={`block mb-1 font-semibold ${
+                                  isMockupDarkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>Transaction Type</label>
                                 <div className="grid grid-cols-2 gap-2">
                                   <button
                                     type="button"
                                     onClick={() => setNewLedgerIsNegative(true)}
                                     className={`py-1.5 rounded-lg border font-bold text-center transition-all ${
                                       newLedgerIsNegative
-                                        ? 'bg-red-500/20 border-red-500 text-red-300'
-                                        : 'bg-white/5 border-white/10 text-slate-400'
+                                        ? isMockupDarkMode
+                                          ? 'bg-red-500/20 border-red-500 text-red-300'
+                                          : 'bg-red-50 border-red-500 text-red-600 shadow-sm'
+                                        : isMockupDarkMode
+                                          ? 'bg-white/5 border-white/10 text-slate-400'
+                                          : 'bg-slate-50 border-slate-200 text-slate-500'
                                     }`}
                                   >
                                     You Gave
@@ -735,8 +873,12 @@ export default function App() {
                                     onClick={() => setNewLedgerIsNegative(false)}
                                     className={`py-1.5 rounded-lg border font-bold text-center transition-all ${
                                       !newLedgerIsNegative
-                                        ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                                        : 'bg-white/5 border-white/10 text-slate-400'
+                                        ? isMockupDarkMode
+                                          ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                          : 'bg-blue-50 border-blue-500 text-blue-600 shadow-sm'
+                                        : isMockupDarkMode
+                                          ? 'bg-white/5 border-white/10 text-slate-400'
+                                          : 'bg-slate-50 border-slate-200 text-slate-500'
                                     }`}
                                   >
                                     You Got
@@ -756,17 +898,21 @@ export default function App() {
                       </AnimatePresence>
 
                       {/* Bottom controls mockup */}
-                      <div className="p-3 border-t border-white/5 bg-slate-950/80 flex justify-around items-center rounded-b-[36px] text-[10px] font-bold text-slate-400 shrink-0">
-                        <span className="text-blue-400 flex flex-col items-center">
+                      <div className={`p-3 border-t flex justify-around items-center rounded-b-[36px] text-[10px] font-bold shrink-0 transition-colors duration-300 ${
+                        isMockupDarkMode 
+                          ? 'border-white/5 bg-slate-950/80 text-slate-400' 
+                          : 'border-slate-200 bg-white text-slate-500 shadow-inner'
+                      }`}>
+                        <span className="text-blue-500 flex flex-col items-center">
                           <TrendingUp className="h-4.5 w-4.5 mb-0.5" />
                           <span>Ledgers</span>
                         </span>
                         <span className="flex flex-col items-center">
-                          <CreditCard className="h-4.5 w-4.5 mb-0.5 text-slate-500" />
+                          <CreditCard className="h-4.5 w-4.5 mb-0.5 text-slate-400" />
                           <span>Book</span>
                         </span>
                         <span className="flex flex-col items-center">
-                          <Smartphone className="h-4.5 w-4.5 mb-0.5 text-slate-500" />
+                          <Smartphone className="h-4.5 w-4.5 mb-0.5 text-slate-400" />
                           <span>Sync</span>
                         </span>
                       </div>

@@ -34,7 +34,7 @@ const DEFAULT_ADMIN: User = {
   createdAt: new Date().toISOString()
 };
 
-let useLocalFallback = localStorage.getItem('khataindex_use_local_fallback') === 'true';
+let useLocalFallback = localStorage.getItem('khataindex_forced_local_fallback') === 'true';
 
 export function isUsingLocalFallback(): boolean {
   return useLocalFallback;
@@ -43,7 +43,7 @@ export function isUsingLocalFallback(): boolean {
 export function setUsingLocalFallback(val: boolean) {
   if (useLocalFallback !== val) {
     useLocalFallback = val;
-    localStorage.setItem('khataindex_use_local_fallback', val ? 'true' : 'false');
+    localStorage.setItem('khataindex_forced_local_fallback', val ? 'true' : 'false');
     window.dispatchEvent(new Event('khataindex_fallback_changed'));
     console.warn(`[KhataIndex] Switched fallback mode to: ${val ? 'LOCAL SANDBOX' : 'REMOTE API'}`);
   }
@@ -144,6 +144,20 @@ async function safeJson(res: Response): Promise<any> {
 }
 
 // --- API Service Exports ---
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    if (res.ok) {
+      const data = await safeJson(res);
+      return data?.status === 'ok';
+    }
+    return false;
+  } catch (err) {
+    console.warn('Backend connection health check failed:', err);
+    return false;
+  }
+}
 
 export async function checkAuth(): Promise<User | null> {
   const token = localStorage.getItem('khataindex_token');

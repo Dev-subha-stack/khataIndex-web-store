@@ -10,6 +10,7 @@ interface HeaderProps {
   onOpenEditProfile: () => void;
   currentTab: 'home' | 'feedback';
   onChangeTab: (tab: 'home' | 'feedback') => void;
+  isFallback: boolean;
 }
 
 export default function Header({
@@ -21,6 +22,7 @@ export default function Header({
   onOpenEditProfile,
   currentTab,
   onChangeTab,
+  isFallback,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-slate-950/40 backdrop-blur-md">
@@ -42,9 +44,20 @@ export default function Header({
             <span className="text-white text-lg sm:text-2xl font-light tracking-tight font-sans transition group-hover:text-blue-400">
               Khata<span className="font-bold text-white hidden xs:inline">Index</span>
             </span>
-            <span className="ml-2 hidden md:inline-flex items-center rounded-md bg-white/10 border border-white/10 px-2 py-0.5 text-xs font-semibold text-blue-300">
+            <span className="ml-2 hidden xs:inline-flex items-center rounded-md bg-white/10 border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
               V1.1.0
             </span>
+            {isFallback ? (
+              <span className="ml-1.5 inline-flex items-center rounded-md bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 shadow-sm animate-pulse" title="Running in Local Sandbox Storage (Offline Mode)">
+                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                Sandbox
+              </span>
+            ) : (
+              <span className="ml-1.5 inline-flex items-center rounded-md bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 shadow-sm" title="Connected to Cloud Run Live API">
+                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                Cloud API Live
+              </span>
+            )}
           </div>
         </button>
 

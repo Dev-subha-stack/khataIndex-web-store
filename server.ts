@@ -480,6 +480,10 @@ function adminOnly(req: express.Request, res: express.Response, next: express.Ne
 // API ENDPOINTS
 // -------------------------------------------------------------
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", firebaseAvailable: isFirebaseAvailable });
+});
+
 // Post login
 app.post("/api/auth/login", async (req, res) => {
   const { loginIdentifier, password } = req.body; // username or email
