@@ -11,6 +11,7 @@ import {
   downloadFile,
   getAppSettings,
   updateAppSettings,
+  isUsingLocalFallback,
 } from './api';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
@@ -51,6 +52,39 @@ export default function App() {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [showScreenshot, setShowScreenshot] = useState(true);
   const [currentTab, setCurrentTab] = useState<'home' | 'feedback'>('home');
+  const [isFallback, setIsFallback] = useState(isUsingLocalFallback());
+
+  // Listen to fallback change dispatches
+  useEffect(() => {
+    const handleFallbackChange = () => {
+      setIsFallback(isUsingLocalFallback());
+    };
+    window.addEventListener('khataindex_fallback_changed', handleFallbackChange);
+    return () => {
+      window.removeEventListener('khataindex_fallback_changed', handleFallbackChange);
+    };
+  }, []);
+
+  // Reload versions list when fallback triggers (e.g. from Remote to Local Sandbox)
+  useEffect(() => {
+    async function reloadDataOnFallback() {
+      if (isFallback) {
+        try {
+          const allVersions = await getVersions();
+          setVersions(allVersions);
+          const settings = await getAppSettings();
+          if (settings && settings.screenshotUrl) {
+            setScreenshotUrl(settings.screenshotUrl);
+          } else {
+            setScreenshotUrl(null);
+          }
+        } catch (err) {
+          console.error('Failed to reload local data', err);
+        }
+      }
+    }
+    reloadDataOnFallback();
+  }, [isFallback]);
 
   // Load user status and version history on boot
   useEffect(() => {
@@ -281,6 +315,28 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+        {isFallback && (
+          <div className="mb-8 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-5 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs animate-pulse">
+            <div className="flex items-start space-x-3 text-slate-300">
+              <span className="text-lg leading-none mt-0.5">🌐</span>
+              <div>
+                <span className="font-extrabold text-blue-300">Cloudflare Static Web Sandbox Active</span>
+                <p className="mt-1 text-[11px] text-slate-400 max-w-2xl leading-relaxed">
+                  We detected that this site is deployed on a static hosting platform (e.g. Cloudflare Pages). 
+                  Since there is no Express server backend, we have enabled a secure, high-speed <strong>local sandbox storage engine</strong>. 
+                  You can register a new account or sign in using the pre-seeded developer credentials: 
+                  <strong className="text-white ml-1">subhajit@khataindex.com</strong> (Password: <strong className="text-white">Subhajit#123</strong>) to access the Admin Panel.
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <span className="inline-flex items-center rounded-lg bg-blue-500/15 px-2.5 py-1 text-[10px] font-bold text-blue-300 border border-blue-500/20">
+                100% Client-Side Sandbox
+              </span>
+            </div>
+          </div>
+        )}
+
         {isAdminMode && user?.role === 'admin' ? (
           /* Admin View */
           <motion.div
